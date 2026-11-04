@@ -25,6 +25,7 @@ paths = ['bsd/dev/redwood_cell.c', 'bsd/dev/redwood_ipa.c', 'bsd/dev/redwood_mps
          'bsd/dev/lemonade_battery.c', 'bsd/sys/lemonade_battery.h', 'iokit/Kernel/RedwoodBattery.cpp',
 	 'bsd/dev/lemonade_display.c', 'bsd/sys/lemonade_display.h', 'iokit/Kernel/MiniIOMobileFramebuffer.cpp', 'iokit/Kernel/RedwoodGPU.cpp',
          'bsd/dev/lemonade_touch.c', 'bsd/dev/lemonade_touch_protocol.h',
+         'bsd/dev/martini_synaptics.c',
          'bsd/dev/lemonade_wifi.c', 'bsd/dev/lemonade_mhi_protocol.h', 'bsd/dev/redwood_wifi.c', 'bsd/dev/redwood_goodix.c',
          'bsd/dev/redwood_lx.c', 'bsd/sys/redwood_lx.h', 'bsd/sys/redwood_qrtr.h', 'bsd/sys/lemonade_wifi.h',
          'bsd/dev/redwood_buttons.c', 'bsd/dev/redwood_input.c', 'bsd/sys/redwood_input.h',
