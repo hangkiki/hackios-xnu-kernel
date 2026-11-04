@@ -89,6 +89,13 @@ jobs:
       - name: Compile and package generic components
         run: bash tools/ci/build-lemonade.sh
 
+      - name: Upload CI package
+        uses: actions/upload-artifact@v4
+        with:
+          name: lemonade-ci-package
+          path: out/ci-release/*.tar.gz
+          if-no-files-found: error
+
   publish:
     needs: [linux-tests, metal-tests]
     if: github.repository == 'b1ackm4x/hackios-xnu-kernel' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
