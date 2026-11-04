@@ -289,6 +289,7 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 	static uint8_t chunk[2048];
 	uint8_t out[8];
 
+	pause_ms(3000); /* let the display driver bring the panel up first */
 	pins = ml_io_map(0x0f100000, 0x80000);
 	redwood_tl("s3908: martini Synaptics S3908 diagnostic, mode %u\n", mode);
 	redwood_tl("s3908: pins SDA=%u SCL=%u IRQ=%u; SDA=%u SCL=%u IRQ=%u\n",
@@ -321,22 +322,23 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 	 * format is what turns reporting on.  Ask for the current configuration,
 	 * then set a simple one: per active object, index/class/x/y/width/height.
 	 */
-	(void)tcm_command(0x25, NULL, 0);
-	pause_ms(60);
-	static const uint8_t config[] = {
-		1,            /* foreach active object */
-		6, 4, 7, 4,   /* index, classification */
-		8, 16, 9, 16, /* x, y */
-		11, 12, 12, 12, /* width, height */
-		3,            /* foreach end */
-		0             /* touch end */
-	};
-	if (tcm_command(0x26, config, sizeof(config))) {
-		redwood_tl("s3908: touch report config sent\n");
+	static uint8_t report_config[128];
+	memset(report_config, 0, sizeof(report_config));
+	report_config[0] = 1;              /* foreach active object */
+	report_config[1] = 6; report_config[2] = 4;   /* object index, 4 bits */
+	report_config[3] = 7; report_config[4] = 4;   /* classification, 4 bits */
+	report_config[5] = 8; report_config[6] = 16;  /* x, 16 bits */
+	report_config[7] = 9; report_config[8] = 16;  /* y, 16 bits */
+	report_config[9] = 11; report_config[10] = 12; /* width, 12 bits */
+	report_config[11] = 12; report_config[12] = 12; /* height, 12 bits */
+	report_config[13] = 3;             /* foreach end */
+	report_config[14] = 0;             /* touch end */
+	if (tcm_command(0x26, report_config, sizeof(report_config))) {
+		redwood_tl("s3908: touch report config sent (128 bytes)\n");
 	} else {
 		redwood_tl("s3908: touch report config failed\n");
 	}
-	pause_ms(60);
+	pause_ms(80);
 
 	for (unsigned i = 0; i < 3000; i++) {
 		bool low = !level(IRQ);
