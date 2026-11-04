@@ -304,6 +304,7 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 	line(SCL, true);
 	output(RESET, true, 3, 8);
 	pause_ms(150);
+	wr(PIN_CFG(IRQ), 0); /* plain GPIO input, no pull */
 	redwood_tl("s3908: reset released; SDA=%u SCL=%u IRQ=%u\n",
 	    level(SDA), level(SCL), level(IRQ));
 
@@ -323,15 +324,21 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 		redwood_tl("s3908: enable report failed\n");
 	}
 
-	for (unsigned i = 0; i < 30000; i++) {
-		if (!level(IRQ)) {
-			if (tcm_read(chunk, 256)) {
-				parse_chunk(chunk, 256);
+	for (unsigned i = 0; i < 3000; i++) {
+		bool low = !level(IRQ);
+		if (low || (i % 10) == 0) {
+			if (tcm_read(chunk, 128)) {
+				if (chunk[0] == TCM_MARKER) {
+					if (low) {
+						redwood_tl("s3908: irq low, bytes %02x %02x %02x %02x\n", chunk[0], chunk[1], chunk[2], chunk[3]);
+					}
+					parse_chunk(chunk, 128);
+				}
 			} else {
 				errors++;
 			}
 		}
-		pause_ms(2);
+		pause_ms(20);
 	}
 	redwood_tl("s3908: diagnostic stopped; messages %u reports %u errors %u\n",
 	    msgs, reports, errors);
