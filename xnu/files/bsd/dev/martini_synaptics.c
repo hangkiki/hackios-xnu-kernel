@@ -1,7 +1,8 @@
 /*
  * OnePlus 9RT (martini), Synaptics S3908 on I2C 0x4B (i2c@990000, GPIO20/21),
  * reset GPIO22, IRQ GPIO23.  TCM framing: 4-byte header (0xA5, code, len lo/hi),
- * payload, 0x5A padding.  Diagnostic build: touchscreen=3 logs raw messages.
+ * payload, 0x5A padding.  A message arrives inside one I2C read transaction.
+ * touchscreen=3 runs the diagnostic and logs what the controller answers.
  */
 #include <sys/lemonade_radio.h>
 #include <kern/clock.h>
@@ -23,7 +24,6 @@ extern void redwood_tl(const char *format, ...) __printflike(1, 2);
 #define TCM_ADDRESS 0x4b
 #define TCM_MARKER 0xa5
 #define TCM_PADDING 0x5a
-#define TCM_STATUS_OK 0x01
 #define TCM_CMD_ENABLE_REPORT 0x05
 #define TCM_REPORT_TOUCH 0x11
 
@@ -72,7 +72,6 @@ output(unsigned pin, bool high, unsigned pull, unsigned ma)
 	wr(PIN_CFG(pin), pull | (ma / 2 - 1) << 6 | 1u << 9);
 }
 
-/* Open drain: high releases the line, low drives it. */
 static void
 line(unsigned pin, bool high)
 {
@@ -225,8 +224,8 @@ tcm_write(const uint8_t *buffer, unsigned length)
 static void
 dump(const char *tag, const uint8_t *data, unsigned length)
 {
-	char text[3 * 32 + 1];
-	unsigned shown = length < 32 ? length : 32;
+	char text[3 * 24 + 1];
+	unsigned shown = length < 24 ? length : 24;
 	unsigned at = 0;
 	for (unsigned i = 0; i < shown; i++) {
 		at += snprintf(text + at, sizeof(text) - at, "%02x ", data[i]);
@@ -235,39 +234,29 @@ dump(const char *tag, const uint8_t *data, unsigned length)
 	redwood_tl("s3908: %s (%u) %s\n", tag, length, text);
 }
 
-/* Read one TCM message.  Returns false when the header is not a TCM marker. */
-static bool
-tcm_message(uint8_t *payload, unsigned payload_size, unsigned *code, unsigned *length)
+static void
+parse_chunk(const uint8_t *data, unsigned length)
 {
-	uint8_t header[4];
-	if (!tcm_read(header, sizeof(header))) {
-		errors++;
-		return false;
-	}
-	if (header[0] != TCM_MARKER) {
-		dump("raw header", header, sizeof(header));
-		errors++;
-		return false;
-	}
-	*code = header[1];
-	*length = (unsigned)header[2] | ((unsigned)header[3] << 8);
-	unsigned want = *length;
-	if (want > payload_size) {
-		want = payload_size;
-	}
-	if (want && !tcm_read(payload, want)) {
-		errors++;
-		return false;
-	}
-	/* The message ends with a 0x5A padding byte; consume it when it fits. */
-	if (*length < payload_size && *length) {
-		uint8_t padding;
-		if (tcm_read(&padding, 1) && padding != TCM_PADDING) {
-			redwood_tl("s3908: padding %02x (expected 5a)\n", padding);
+	unsigned offset = 0;
+	while (offset + 5 <= length) {
+		if (data[offset] != TCM_MARKER) {
+			redwood_tl("s3908: chunk sync lost at %u (byte %02x)\n", offset, data[offset]);
+			break;
 		}
+		unsigned code = data[offset + 1];
+		unsigned size = (unsigned)data[offset + 2] | ((unsigned)data[offset + 3] << 8);
+		if (size > 2048 || offset + 4 + size + 1 > length) {
+			redwood_tl("s3908: chunk truncated code %02x size %u\n", code, size);
+			break;
+		}
+		msgs++;
+		redwood_tl("s3908: message code %02x length %u\n", code, size);
+		dump(code == TCM_REPORT_TOUCH ? "report" : "payload", data + offset + 4, size);
+		if (code == TCM_REPORT_TOUCH) {
+			reports++;
+		}
+		offset += 4 + size + 1;
 	}
-	msgs++;
-	return true;
 }
 
 static bool
@@ -291,8 +280,8 @@ tcm_command(uint8_t command, const uint8_t *data, unsigned length)
 static void
 touch_thread(__unused void *arg, __unused wait_result_t result)
 {
-	uint8_t payload[256];
-	unsigned code = 0, length = 0;
+	static uint8_t chunk[2048];
+	uint8_t out[8];
 
 	pins = ml_io_map(0x0f100000, 0x80000);
 	redwood_tl("s3908: martini Synaptics S3908 diagnostic, mode %u\n", mode);
@@ -312,36 +301,28 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 	redwood_tl("s3908: reset released; SDA=%u SCL=%u IRQ=%u\n",
 	    level(SDA), level(SCL), level(IRQ));
 
-	for (unsigned i = 0; i < 6; i++) {
-		if (tcm_message(payload, sizeof(payload), &code, &length)) {
-			redwood_tl("s3908: message code %02x length %u\n", code, length);
-			dump("payload", payload, length);
-		} else {
-			redwood_tl("s3908: no message (%u errors)\n", errors);
-			pause_ms(20);
-		}
+	if (tcm_read(chunk, sizeof(chunk))) {
+		redwood_tl("s3908: first read ok, marker %02x code %02x len %u\n",
+		    chunk[0], chunk[1], (unsigned)chunk[2] | ((unsigned)chunk[3] << 8));
+		parse_chunk(chunk, sizeof(chunk));
+	} else {
+		redwood_tl("s3908: first read failed\n");
+		errors++;
 	}
 
-	uint8_t enable = TCM_REPORT_TOUCH;
-	if (tcm_command(TCM_CMD_ENABLE_REPORT, &enable, 1)) {
+	out[0] = TCM_REPORT_TOUCH;
+	if (tcm_command(TCM_CMD_ENABLE_REPORT, out, 1)) {
 		redwood_tl("s3908: enable report 0x11 sent\n");
 	} else {
 		redwood_tl("s3908: enable report failed\n");
 	}
 
-	for (unsigned i = 0; i < 4000; i++) {
+	for (unsigned i = 0; i < 3000; i++) {
 		if (!level(IRQ)) {
-			if (tcm_message(payload, sizeof(payload), &code, &length)) {
-				if (code == TCM_REPORT_TOUCH) {
-					reports++;
-					if (reports <= 20) {
-						redwood_tl("s3908: touch report %u length %u\n", reports, length);
-						dump("report", payload, length);
-					}
-				} else {
-					redwood_tl("s3908: message code %02x length %u\n", code, length);
-					dump("payload", payload, length);
-				}
+			if (tcm_read(chunk, 256)) {
+				parse_chunk(chunk, 256);
+			} else {
+				errors++;
 			}
 		}
 		pause_ms(2);
