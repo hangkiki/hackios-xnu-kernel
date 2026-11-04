@@ -219,6 +219,7 @@ redwood_input_init(void)
 	redwood_virtio_input_init();
 	redwood_goodix_init();
 	lemonade_touch_init();
+	martini_synaptics_init();
 	redwood_buttons_init();
 	redwood_battery_init();
 	lemonade_battery_init();
