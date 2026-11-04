@@ -317,12 +317,26 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 		errors++;
 	}
 
-	out[0] = TCM_REPORT_TOUCH;
-	if (tcm_command(TCM_CMD_ENABLE_REPORT, out, 1)) {
-		redwood_tl("s3908: enable report 0x11 sent\n");
+	/* The controller answers NOT_IMPLEMENTED to ENABLE_REPORT; the touch report
+	 * format is what turns reporting on.  Ask for the current configuration,
+	 * then set a simple one: per active object, index/class/x/y/width/height.
+	 */
+	(void)tcm_command(0x25, NULL, 0);
+	pause_ms(60);
+	static const uint8_t config[] = {
+		1,            /* foreach active object */
+		6, 4, 7, 4,   /* index, classification */
+		8, 16, 9, 16, /* x, y */
+		11, 12, 12, 12, /* width, height */
+		3,            /* foreach end */
+		0             /* touch end */
+	};
+	if (tcm_command(0x26, config, sizeof(config))) {
+		redwood_tl("s3908: touch report config sent\n");
 	} else {
-		redwood_tl("s3908: enable report failed\n");
+		redwood_tl("s3908: touch report config failed\n");
 	}
+	pause_ms(60);
 
 	for (unsigned i = 0; i < 3000; i++) {
 		bool low = !level(IRQ);
