@@ -69,6 +69,8 @@ jobs:
 
   build:
     needs: [linux-tests, metal-tests]
+    permissions:
+      contents: write
     if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 90
@@ -89,12 +91,12 @@ jobs:
       - name: Compile and package generic components
         run: bash tools/ci/build-lemonade.sh
 
-      - name: Upload CI package
-        uses: actions/upload-artifact@v4
-        with:
-          name: lemonade-ci-package
-          path: out/ci-release/*.tar.gz
-          if-no-files-found: error
+      - name: Publish CI package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="ci-martini-${GITHUB_SHA::12}"
+          gh release create "$tag" out/ci-release/*.tar.gz out/ci-release/manifest.json --title "$tag" --notes "martini synaptics driver build" || gh release upload "$tag" out/ci-release/*.tar.gz out/ci-release/manifest.json --clobber
 
   publish:
     needs: [linux-tests, metal-tests]
