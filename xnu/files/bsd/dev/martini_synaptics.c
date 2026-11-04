@@ -268,8 +268,8 @@ parse_chunk(const uint8_t *data, unsigned length)
 static bool
 tcm_command(uint8_t command, const uint8_t *data, unsigned length)
 {
-	uint8_t out[8];
-	if (length > 3) {
+	uint8_t out[64];
+	if (length > sizeof(out) - 5) {
 		return false;
 	}
 	out[0] = TCM_MARKER;
