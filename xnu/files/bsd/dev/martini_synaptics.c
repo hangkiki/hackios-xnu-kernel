@@ -239,6 +239,12 @@ parse_chunk(const uint8_t *data, unsigned length)
 {
 	unsigned offset = 0;
 	while (offset + 5 <= length) {
+		while (offset < length && data[offset] == TCM_PADDING) {
+			offset++;
+		}
+		if (offset + 5 > length) {
+			break;
+		}
 		if (data[offset] != TCM_MARKER) {
 			redwood_tl("s3908: chunk sync lost at %u (byte %02x)\n", offset, data[offset]);
 			break;
@@ -317,7 +323,7 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 		redwood_tl("s3908: enable report failed\n");
 	}
 
-	for (unsigned i = 0; i < 3000; i++) {
+	for (unsigned i = 0; i < 30000; i++) {
 		if (!level(IRQ)) {
 			if (tcm_read(chunk, 256)) {
 				parse_chunk(chunk, 256);
