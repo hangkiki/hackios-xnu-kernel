@@ -41,7 +41,8 @@ void redwood_touch_post(uint32_t type, uint32_t finger, uint32_t x, uint32_t y);
 void redwood_input_init(void);
 void redwood_virtio_input_init(void);   /* boot-arg virtio_input=1: QEMU's virtio pointer and keyboard */
 void redwood_goodix_init(void);         /* boot-arg touchscreen=1: the phone's Goodix or FocalTech touch screen */
-void lemonade_touch_init(void);         /* lemonade Samsung S6SY792, separately platform-gated */
+void lemonade_touch_init(void);
+void martini_synaptics_init(void);      /* martini Synaptics S3908, touchscreen=3 */         /* lemonade Samsung S6SY792, separately platform-gated */
 void lemonade_display_init(void);       /* guarded SM8350 DPU survey, no panel programming */
 void lemonade_display_quiesce(void);    /* restore temporary register-bus clock votes */
 void redwood_buttons_init(void);        /* boot-arg buttons=1: the phone's power and volume keys */
