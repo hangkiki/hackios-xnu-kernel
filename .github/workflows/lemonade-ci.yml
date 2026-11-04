@@ -68,7 +68,7 @@ jobs:
           bash devices/oneplus-9/tools/test-lemonade-bluetooth.sh
 
   build:
-    needs: [linux-tests, metal-tests]
+    needs: [linux-tests]
     permissions:
       contents: write
     if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
