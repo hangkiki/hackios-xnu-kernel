@@ -269,18 +269,16 @@ static bool
 tcm_command(uint8_t command, const uint8_t *data, unsigned length)
 {
 	uint8_t out[160];
-	if (length > sizeof(out) - 5) {
+	if (length > sizeof(out) - 3) {
 		return false;
 	}
-	out[0] = TCM_MARKER;
-	out[1] = command;
-	out[2] = (uint8_t)(length & 0xff);
-	out[3] = (uint8_t)(length >> 8);
+	out[0] = command;
+	out[1] = (uint8_t)(length & 0xff);
+	out[2] = (uint8_t)(length >> 8);
 	for (unsigned i = 0; i < length; i++) {
-		out[4 + i] = data[i];
+		out[3 + i] = data[i];
 	}
-	out[4 + length] = TCM_PADDING;
-	return tcm_write(out, 5 + length);
+	return tcm_write(out, 3 + length);
 }
 
 static void
@@ -322,17 +320,30 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 	 * format is what turns reporting on.  Ask for the current configuration,
 	 * then set a simple one: per active object, index/class/x/y/width/height.
 	 */
+	/* Leave deep sleep; without this the controller stays silent. */
+	if (tcm_command(0x2d, NULL, 0)) {
+		redwood_tl("s3908: exit deep sleep sent\n");
+	} else {
+		redwood_tl("s3908: exit deep sleep failed\n");
+	}
+	pause_ms(50);
 	static uint8_t report_config[128];
 	memset(report_config, 0, sizeof(report_config));
-	report_config[0] = 1;              /* foreach active object */
-	report_config[1] = 6; report_config[2] = 4;   /* object index, 4 bits */
-	report_config[3] = 7; report_config[4] = 4;   /* classification, 4 bits */
-	report_config[5] = 8; report_config[6] = 16;  /* x, 16 bits */
-	report_config[7] = 9; report_config[8] = 16;  /* y, 16 bits */
-	report_config[9] = 11; report_config[10] = 12; /* width, 12 bits */
-	report_config[11] = 12; report_config[12] = 12; /* height, 12 bits */
-	report_config[13] = 3;             /* foreach end */
-	report_config[14] = 0;             /* touch end */
+	static const uint8_t vendor_config[] = {
+		0x10, 0x08,             /* gesture double tap, 8 bits */
+		0xc6, 0x30,             /* gesture info, 48 bits */
+		0xc7, 0xc0,             /* gesture coordinate */
+		0x01,                   /* foreach active object */
+		0x06, 0x04,             /* object index, 4 bits */
+		0x07, 0x04,             /* classification, 4 bits */
+		0x08, 0x10,             /* x, 16 bits */
+		0x09, 0x10,             /* y, 16 bits */
+		0x03,                   /* foreach end */
+		0x00                    /* touch end */
+	};
+	for (unsigned i = 0; i < sizeof(vendor_config); i++) {
+		report_config[i] = vendor_config[i];
+	}
 	if (tcm_command(0x26, report_config, sizeof(report_config))) {
 		redwood_tl("s3908: touch report config sent (128 bytes)\n");
 	} else {
