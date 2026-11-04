@@ -48,7 +48,7 @@ python3 - "$XNU_SRC/bsd/conf/files" <<'PY'
 from pathlib import Path
 import sys
 p = Path(sys.argv[1]); original = p.read_text(); s = original
-for name in ('redwood_cell.c', 'redwood_ipa.c', 'redwood_mpss.c', 'redwood_nas.c', 'lemonade_radio.c', 'lemonade_bluetooth.c', 'lemonade_touch.c', 'lemonade_wifi.c', 'lemonade_display.c', 'lemonade_battery.c'):
+for name in ('redwood_cell.c', 'redwood_ipa.c', 'redwood_mpss.c', 'redwood_nas.c', 'lemonade_radio.c', 'lemonade_bluetooth.c', 'lemonade_touch.c', 'lemonade_wifi.c', 'lemonade_display.c', 'lemonade_battery.c', 'martini_synaptics.c'):
     if 'bsd/dev/' + name not in s:
         s += '\nbsd/dev/' + name + '\tstandard\n'
 if s != original:
