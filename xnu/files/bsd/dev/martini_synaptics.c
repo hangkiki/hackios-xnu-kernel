@@ -351,7 +351,7 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 	}
 	pause_ms(80);
 
-	for (unsigned i = 0; i < 3000; i++) {
+	for (unsigned i = 0; i < 15000; i++) {
 		bool low = !level(IRQ);
 		if (low || (i % 10) == 0) {
 			if (tcm_read(chunk, 128)) {
