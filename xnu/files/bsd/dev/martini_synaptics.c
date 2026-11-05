@@ -350,6 +350,14 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 		redwood_tl("s3908: touch report config failed\n");
 	}
 	pause_ms(80);
+	/* Enable the touch report now that the format is set. */
+	uint8_t enable_touch = 0x11;
+	if (tcm_command(0x05, &enable_touch, 1)) {
+		redwood_tl("s3908: enable touch report sent\n");
+	} else {
+		redwood_tl("s3908: enable touch report failed\n");
+	}
+	pause_ms(50);
 
 	for (unsigned i = 0; i < 15000; i++) {
 		bool low = !level(IRQ);
