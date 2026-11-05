@@ -281,6 +281,30 @@ tcm_command(uint8_t command, const uint8_t *data, unsigned length)
 	return tcm_write(out, 3 + length);
 }
 
+/* Send a command and wait for the controller's status answer.  Log 
+every message seen so a refused command is visible. */
+static unsigned
+tcm_request(const char *name, uint8_t command, const uint8_t *data, unsigned length)
+{
+	if (!tcm_command(command, data, length)) {
+		redwood_tl("s3908: %s write failed\n", name);
+		return 0xffff;
+	}
+	for (unsigned i = 0; i < 40; i++) {
+		uint8_t chunk[64];
+		if (tcm_read(chunk, sizeof(chunk)) && chunk[0] == TCM_MARKER) {
+			unsigned code = chunk[1];
+			if (code != 0x1d) {
+				redwood_tl("s3908: %s answered %02x\n", name, code);
+				return code;
+			}
+		}
+		pause_ms(2);
+	}
+	redwood_tl("s3908: %s no answer\n", name);
+	return 0xfffe;
+}
+
 static void
 touch_thread(__unused void *arg, __unused wait_result_t result)
 {
@@ -320,43 +344,22 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 	 * format is what turns reporting on.  Ask for the current configuration,
 	 * then set a simple one: per active object, index/class/x/y/width/height.
 	 */
-	/* Leave deep sleep; without this the controller stays silent. */
-	if (tcm_command(0x2d, NULL, 0)) {
-		redwood_tl("s3908: exit deep sleep sent\n");
-	} else {
-		redwood_tl("s3908: exit deep sleep failed\n");
-	}
+	/* Bring the controller up in the same order the vendor driver does. */
+	(void)tcm_request("exit deep sleep", 0x2d, NULL, 0);
 	pause_ms(50);
 	static uint8_t report_config[128];
 	memset(report_config, 0, sizeof(report_config));
 	static const uint8_t vendor_config[] = {
-		0x10, 0x08,             /* gesture double tap, 8 bits */
-		0xc6, 0x30,             /* gesture info, 48 bits */
-		0xc7, 0xc0,             /* gesture coordinate */
-		0x01,                   /* foreach active object */
-		0x06, 0x04,             /* object index, 4 bits */
-		0x07, 0x04,             /* classification, 4 bits */
-		0x08, 0x10,             /* x, 16 bits */
-		0x09, 0x10,             /* y, 16 bits */
-		0x03,                   /* foreach end */
-		0x00                    /* touch end */
+		0x10, 0x08, 0xc6, 0x30, 0xc7, 0xc0,
+		0x01, 0x06, 0x04, 0x07, 0x04, 0x08, 0x10, 0x09, 0x10, 0x03, 0x00
 	};
 	for (unsigned i = 0; i < sizeof(vendor_config); i++) {
 		report_config[i] = vendor_config[i];
 	}
-	if (tcm_command(0x26, report_config, sizeof(report_config))) {
-		redwood_tl("s3908: touch report config sent (128 bytes)\n");
-	} else {
-		redwood_tl("s3908: touch report config failed\n");
-	}
+	(void)tcm_request("report config", 0x26, report_config, sizeof(report_config));
 	pause_ms(80);
-	/* Enable the touch report now that the format is set. */
 	uint8_t enable_touch = 0x11;
-	if (tcm_command(0x05, &enable_touch, 1)) {
-		redwood_tl("s3908: enable touch report sent\n");
-	} else {
-		redwood_tl("s3908: enable touch report failed\n");
-	}
+	(void)tcm_request("enable touch", 0x05, &enable_touch, 1);
 	pause_ms(50);
 
 	for (unsigned i = 0; i < 15000; i++) {
