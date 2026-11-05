@@ -364,7 +364,9 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 
 	for (unsigned i = 0; i < 15000; i++) {
 		bool low = !level(IRQ);
-		if (low || (i % 10) == 0) {
+		/* TCM2 is host polled: ask for the next report. */
+		(void)tcm_command(0x0a, NULL, 0);
+		if (low || true) {
 			if (tcm_read(chunk, 128)) {
 				if (chunk[0] == TCM_MARKER) {
 					if (low) {
