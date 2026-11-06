@@ -30,6 +30,9 @@ extern void redwood_tl(const char *format, ...) __printflike(1, 2);
 static vm_offset_t pins;
 static uint32_t mode;
 static unsigned msgs, reports, errors;
+static uint32_t last_x[10], last_y[10];
+static unsigned active_mask;
+static unsigned long posted_down, posted_move, posted_up;
 
 static uint32_t
 rd(vm_offset_t address)
@@ -234,6 +237,45 @@ dump(const char *tag, const uint8_t *data, unsigned length)
 	redwood_tl("s3908: %s (%u) %s\n", tag, length, text);
 }
 
+/* The touch report starts with the gesture block (1 + 6 + 24 bytes);
+ * then five bytes per active object: index, class, x and y. */
+static void
+parse_touch(const uint8_t *data, unsigned length)
+{
+	static const unsigned object_base = 31;
+	unsigned mask = 0;
+	if (length < object_base + 5) {
+		return;
+	}
+	unsigned objects = (length - object_base) / 5;
+	for (unsigned i = 0; i < objects; i++) {
+		const uint8_t *o = data + object_base + 5 * i;
+		unsigned index = o[0] & 0x0f;
+		unsigned cls = o[0] >> 4;
+		uint32_t x = (uint32_t)o[1] | ((uint32_t)o[2] << 8);
+		uint32_t y = (uint32_t)o[3] | ((uint32_t)o[4] << 8);
+		if (index >= 10 || cls == 0) {
+			continue;
+		}
+		mask |= 1u << index;
+		if (active_mask & (1u << index)) {
+			redwood_touch_post(REDWOOD_TOUCH_MOVE, index, x, y);
+			posted_move++;
+		} else {
+			redwood_touch_post(REDWOOD_TOUCH_DOWN, index, x, y);
+			posted_down++;
+		}
+		last_x[index] = x; last_y[index] = y;
+	}
+	for (unsigned index = 0; index < 10; index++) {
+		if ((active_mask & (1u << index)) && !(mask & (1u << index))) {
+			redwood_touch_post(REDWOOD_TOUCH_UP, index, last_x[index], last_y[index]);
+			posted_up++;
+		}
+	}
+	active_mask = mask;
+}
+
 static void
 parse_chunk(const uint8_t *data, unsigned length)
 {
@@ -260,6 +302,7 @@ parse_chunk(const uint8_t *data, unsigned length)
 		dump(code == TCM_REPORT_TOUCH ? "report" : "payload", data + offset + 4, size);
 		if (code == TCM_REPORT_TOUCH) {
 			reports++;
+			parse_touch(data + offset + 4, size);
 		}
 		offset += 4 + size + 1;
 	}
@@ -400,7 +443,7 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 		(void)tcm_request("enable touch", 0x05, &en2, 1);
 		pause_ms(50);
 	}
-	redwood_tl("s3908: diagnostic stopped; messages %u reports %u errors %u\n", msgs, reports, errors);
+	redwood_tl("s3908: diagnostic stopped; messages %u reports %u errors %u down %lu move %lu up %lu\n", msgs, reports, errors, posted_down, posted_move, posted_up);
 		thread_terminate(current_thread());
 }
 
