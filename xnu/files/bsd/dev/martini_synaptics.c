@@ -250,6 +250,10 @@ parse_touch(const uint8_t *data, unsigned length)
 	unsigned objects = (length - object_base) / 5;
 	for (unsigned i = 0; i < objects; i++) {
 		const uint8_t *o = data + object_base + 5 * i;
+		if (reports <= 20) {
+			redwood_tl("s3908: obj %u/%u bytes %02x %02x %02x %02x %02x len %u\n",
+			    i, objects, o[0], o[1], o[2], o[3], o[4], length);
+		}
 		unsigned index = o[0] & 0x0f;
 		unsigned cls = o[0] >> 4;
 		uint32_t x = (uint32_t)o[1] | ((uint32_t)o[2] << 8);
