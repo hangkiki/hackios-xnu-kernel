@@ -737,6 +737,8 @@ display_manual_begin(void)
 	if (!display_transaction_begin(&enabled)) return false;
 	vm_offset_t mdp = display_map.mdp, intf = mdp + INTF1_OFFSET;
 	uint32_t sync = rd(intf, 0x288), automatic = rd(intf, 0x2b4);
+	tell("lemonade-display: manual probe flip=%u sync=%#x auto=%#x mux=%#x done=%#x\n",
+	    display_map.flip_active, sync, automatic, rd(intf, 0x25c), rd(mdp, 0x10));
 	/* INTF_MUX selects the pingpong in bits [3:0]; firmware retains 0xf
 	 * in the unrelated [19:16] field. Preserve it, as the stock driver does. */
 	if (!display_map.flip_active || sync != 0x180085 || automatic != 0x80000001 || (rd(intf, 0x25c) & 0xf) != 0 ||
