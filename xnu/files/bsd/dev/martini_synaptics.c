@@ -305,6 +305,9 @@ parse_touch(const uint8_t *data, unsigned length)
 			continue;
 		}
 		mask |= 1u << index;
+		if (!(active_mask & (1u << index)) && posted_down < 60) {
+			redwood_tl("s3908: down raw %u %u -> screen %u %u\n", x, y, sx, sy);
+		}
 		if (active_mask & (1u << index)) {
 			redwood_touch_post(REDWOOD_TOUCH_MOVE, index, sx, sy);
 			posted_move++;
