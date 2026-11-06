@@ -440,18 +440,20 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 	pause_ms(50);
 
 	for (unsigned round = 0; round < 1000; round++) {
-		for (unsigned i = 0; i < 90000; i++) {
+		for (unsigned i = 0; i < 120000; i++) {
 			if (!level(IRQ)) {
-				if (tcm_read(chunk, 96)) {
+				if (tcm_read(chunk, 48)) {
 					if (chunk[0] == TCM_MARKER) {
-						parse_chunk(chunk, 96);
+						parse_chunk(chunk, 48);
 					}
 				} else {
 					errors++;
 				}
+				/* Yield: this kernel runs on one core. */
+				pause_us(500);
 				continue;
 			}
-			pause_us(300);
+			pause_us(500);
 		}
 		if (reports == 0) {
 			redwood_tl("s3908: round %u done without reports\n", round + 1);
