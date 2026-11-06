@@ -34,6 +34,7 @@ static uint32_t last_x[10], last_y[10];
 static unsigned active_mask;
 static unsigned long posted_down, posted_move, posted_up;
 static unsigned max_x_inchip = 8192, max_y_inchip = 16384;
+static unsigned quiet;
 static bool tcm_command(uint8_t command, const uint8_t *data, unsigned length);
 
 static uint32_t
@@ -266,6 +267,18 @@ fetch_limits(void)
 }
 
 static void
+release_fingers(void)
+{
+	for (unsigned i = 0; i < 10; i++) {
+		if (active_mask & (1u << i)) {
+			redwood_touch_post(REDWOOD_TOUCH_UP, i, last_x[i], last_y[i]);
+			posted_up++;
+		}
+	}
+	active_mask = 0;
+}
+
+static void
 parse_touch(const uint8_t *data, unsigned length)
 {
 	static const unsigned object_base = 31;
@@ -442,18 +455,22 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 	for (unsigned round = 0; round < 1000; round++) {
 		for (unsigned i = 0; i < 120000; i++) {
 			if (!level(IRQ)) {
-				if (tcm_read(chunk, 48)) {
+				quiet = 0;
+				if (tcm_read(chunk, 64)) {
 					if (chunk[0] == TCM_MARKER) {
-						parse_chunk(chunk, 48);
+						parse_chunk(chunk, 64);
 					}
 				} else {
 					errors++;
 				}
-				/* Yield: this kernel runs on one core. */
+				pause_us(300);
+			} else {
+				if (active_mask && ++quiet > 200) {
+					release_fingers();
+					quiet = 0;
+				}
 				pause_us(500);
-				continue;
 			}
-			pause_us(500);
 		}
 		if (reports == 0) {
 			redwood_tl("s3908: round %u done without reports\n", round + 1);
