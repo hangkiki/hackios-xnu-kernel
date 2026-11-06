@@ -89,7 +89,7 @@ line(unsigned pin, bool high)
 static void
 i2c_delay(void)
 {
-	pause_us(5);
+	pause_us(2);
 }
 
 static bool
@@ -439,20 +439,23 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 	(void)tcm_request("enable touch", 0x05, &enable_touch, 1);
 	pause_ms(50);
 
-	for (unsigned round = 0; round < 10; round++) {
-		for (unsigned i = 0; i < 4500; i++) {
-			if (!level(IRQ) || (i % 10) == 0) {
-				if (tcm_read(chunk, 128)) {
+	for (unsigned round = 0; round < 1000; round++) {
+		for (unsigned i = 0; i < 90000; i++) {
+			if (!level(IRQ)) {
+				if (tcm_read(chunk, 96)) {
 					if (chunk[0] == TCM_MARKER) {
-						parse_chunk(chunk, 128);
+						parse_chunk(chunk, 96);
 					}
 				} else {
 					errors++;
 				}
+				continue;
 			}
-			pause_ms(20);
+			pause_us(300);
 		}
-		redwood_tl("s3908: round %u done; messages %u reports %u\n", round + 1, msgs, reports);
+		if (reports == 0) {
+			redwood_tl("s3908: round %u done without reports\n", round + 1);
+		}
 		if (reports > 0) {
 			/* The controller is scanning; never reset it again. */
 			continue;
