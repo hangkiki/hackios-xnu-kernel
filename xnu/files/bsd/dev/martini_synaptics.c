@@ -34,6 +34,7 @@ static uint32_t last_x[10], last_y[10];
 static unsigned active_mask;
 static unsigned long posted_down, posted_move, posted_up;
 static unsigned max_x_inchip = 8192, max_y_inchip = 16384;
+static bool tcm_command(uint8_t command, const uint8_t *data, unsigned length);
 
 static uint32_t
 rd(vm_offset_t address)
