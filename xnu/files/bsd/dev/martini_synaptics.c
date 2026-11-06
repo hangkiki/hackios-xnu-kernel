@@ -376,12 +376,26 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 			pause_ms(20);
 		}
 		redwood_tl("s3908: round %u done; messages %u reports %u\n", round + 1, msgs, reports);
+		/* Power-cycle the controller now that the panel is on. */
+		output(RESET, false, 3, 8);
+		pause_ms(20);
+		output(RESET, true, 3, 8);
+		pause_ms(150);
+		for (unsigned k = 0; k < 15; k++) {
+			if (tcm_read(chunk, 64) && chunk[0] == TCM_MARKER) {
+				redwood_tl("s3908: after reset code %02x len %u\n", chunk[1], (unsigned)chunk[2] | ((unsigned)chunk[3] << 8));
+				break;
+			}
+			pause_ms(20);
+		}
+		static const uint8_t normal_mode[] = { 0x09, 0x00, 0x00 };
 		(void)tcm_request("exit deep sleep", 0x2d, NULL, 0);
 		pause_ms(50);
-		static const uint8_t normal_mode[] = { 0x09, 0x00, 0x00 };
 		(void)tcm_request("gesture mode off", 0x24, normal_mode, sizeof(normal_mode));
 		(void)tcm_request("report config", 0x26, report_config, sizeof(report_config));
 		pause_ms(80);
+		(void)tcm_request("get config", 0x25, NULL, 0);
+		pause_ms(30);
 		uint8_t en2 = 0x11;
 		(void)tcm_request("enable touch", 0x05, &en2, 1);
 		pause_ms(50);
