@@ -453,6 +453,10 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 			pause_ms(20);
 		}
 		redwood_tl("s3908: round %u done; messages %u reports %u\n", round + 1, msgs, reports);
+		if (reports > 0) {
+			/* The controller is scanning; never reset it again. */
+			continue;
+		}
 		/* Power-cycle the controller now that the panel is on. */
 		output(RESET, false, 3, 8);
 		pause_ms(20);
