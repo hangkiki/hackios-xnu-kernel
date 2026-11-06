@@ -362,10 +362,20 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 	(void)tcm_request("enable touch", 0x05, &enable_touch, 1);
 	pause_ms(50);
 
+	/* The controller also wants its bring-up once the panel is on. */
+	for (unsigned round = 0; round < 3; round++) {
+		pause_ms(120000);
+		redwood_tl("s3908: bring-up round %u\n", round + 1);
+		(void)tcm_request("exit deep sleep", 0x2d, NULL, 0);
+		pause_ms(50);
+		(void)tcm_request("report config", 0x26, report_config, sizeof(report_config));
+		pause_ms(80);
+		uint8_t en = 0x11;
+		(void)tcm_request("enable touch", 0x05, &en, 1);
+		pause_ms(50);
+	}
 	for (unsigned i = 0; i < 15000; i++) {
 		bool low = !level(IRQ);
-		/* TCM2 is host polled: ask for the next report. */
-		(void)tcm_command(0x0a, NULL, 0);
 		if (low || true) {
 			if (tcm_read(chunk, 128)) {
 				if (chunk[0] == TCM_MARKER) {
