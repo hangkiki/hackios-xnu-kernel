@@ -33,7 +33,8 @@ static unsigned msgs, reports, errors;
 static uint32_t last_x[10], last_y[10];
 static unsigned active_mask;
 static unsigned long posted_down, posted_move, posted_up;
-static unsigned max_x_inchip = 8192, max_y_inchip = 16384;
+/* AMS662ZS01 reports an 8640 x 19200 grid (eight times the panel). */
+static unsigned max_x_inchip = 8640, max_y_inchip = 19200;
 static unsigned quiet;
 static bool tcm_command(uint8_t command, const uint8_t *data, unsigned length);
 
