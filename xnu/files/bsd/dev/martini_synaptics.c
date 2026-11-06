@@ -284,10 +284,10 @@ parse_touch(const uint8_t *data, unsigned length)
 		unsigned cls = o[0] >> 4;
 		uint32_t x = (uint32_t)o[1] | ((uint32_t)o[2] << 8);
 		uint32_t y = (uint32_t)o[3] | ((uint32_t)o[4] << 8);
-		uint32_t sx = x * 1080u / max_x_inchip;
-		uint32_t sy = y * 2400u / max_y_inchip;
-		if (sx > 1079) sx = 1079;
-		if (sy > 2399) sy = 2399;
+		uint32_t sx = x * 65535u / max_x_inchip;
+		uint32_t sy = y * 65535u / max_y_inchip;
+		if (sx > 65535) sx = 65535;
+		if (sy > 65535) sy = 65535;
 		if (index >= 10 || cls == 0) {
 			continue;
 		}

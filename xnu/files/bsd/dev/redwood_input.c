@@ -214,6 +214,10 @@ redwood_input_init(void)
 	if (major < 0 || devfs_make_node(makedev(major, 0), DEVFS_CHAR, UID_ROOT, GID_WHEEL, 0666, "redwood-touch") == NULL) {
 		printf("redwood-touch: cannot create the device\n");
 	}
+	/* The redwood userland reads /dev/hakios-touch; keep that name working. */
+	if (major >= 0) {
+		devfs_make_node(makedev(major, 0), DEVFS_CHAR, UID_ROOT, GID_WHEEL, 0666, "hakios-touch");
+	}
 	exit_call = thread_call_allocate(exit_hold_elapsed, NULL);
 	redwood_cpufreq_init();
 	redwood_virtio_input_init();
