@@ -33,6 +33,7 @@ static unsigned msgs, reports, errors;
 static uint32_t last_x[10], last_y[10];
 static unsigned active_mask;
 static unsigned long posted_down, posted_move, posted_up;
+static unsigned max_x_inchip = 8192, max_y_inchip = 16384;
 
 static uint32_t
 rd(vm_offset_t address)
@@ -239,6 +240,30 @@ dump(const char *tag, const uint8_t *data, unsigned length)
 
 /* The touch report starts with the gesture block (1 + 6 + 24 bytes);
  * then five bytes per active object: index, class, x and y. */
+/* GET_APPLICATION_INFO (0x20) carries the controller limits at
+ * offset 32 (max_x) and 34 (max_y). */
+static void
+fetch_limits(void)
+{
+	uint8_t chunk[128];
+	(void)tcm_command(0x20, NULL, 0);
+	for (unsigned i = 0; i < 40; i++) {
+		if (tcm_read(chunk, sizeof(chunk)) && chunk[0] == TCM_MARKER) {
+			unsigned len = (unsigned)chunk[2] | ((unsigned)chunk[3] << 8);
+			if (len >= 36) {
+				const uint8_t *p = chunk + 4;
+				max_x_inchip = (unsigned)p[32] | ((unsigned)p[33] << 8);
+				max_y_inchip = (unsigned)p[34] | ((unsigned)p[35] << 8);
+				max_x_inchip += 1; max_y_inchip += 1;
+				redwood_tl("s3908: limits max_x %u max_y %u\n", max_x_inchip, max_y_inchip);
+				return;
+			}
+		}
+		pause_ms(10);
+	}
+	redwood_tl("s3908: limits unavailable, keeping %u x %u\n", max_x_inchip, max_y_inchip);
+}
+
 static void
 parse_touch(const uint8_t *data, unsigned length)
 {
@@ -258,15 +283,19 @@ parse_touch(const uint8_t *data, unsigned length)
 		unsigned cls = o[0] >> 4;
 		uint32_t x = (uint32_t)o[1] | ((uint32_t)o[2] << 8);
 		uint32_t y = (uint32_t)o[3] | ((uint32_t)o[4] << 8);
+		uint32_t sx = x * 1080u / max_x_inchip;
+		uint32_t sy = y * 2400u / max_y_inchip;
+		if (sx > 1079) sx = 1079;
+		if (sy > 2399) sy = 2399;
 		if (index >= 10 || cls == 0) {
 			continue;
 		}
 		mask |= 1u << index;
 		if (active_mask & (1u << index)) {
-			redwood_touch_post(REDWOOD_TOUCH_MOVE, index, x, y);
+			redwood_touch_post(REDWOOD_TOUCH_MOVE, index, sx, sy);
 			posted_move++;
 		} else {
-			redwood_touch_post(REDWOOD_TOUCH_DOWN, index, x, y);
+			redwood_touch_post(REDWOOD_TOUCH_DOWN, index, sx, sy);
 			posted_down++;
 		}
 		last_x[index] = x; last_y[index] = y;
@@ -443,6 +472,7 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 		pause_ms(80);
 		(void)tcm_request("get config", 0x25, NULL, 0);
 		pause_ms(30);
+		fetch_limits();
 		uint8_t en2 = 0x11;
 		(void)tcm_request("enable touch", 0x05, &en2, 1);
 		pause_ms(50);
