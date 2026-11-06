@@ -362,37 +362,32 @@ touch_thread(__unused void *arg, __unused wait_result_t result)
 	(void)tcm_request("enable touch", 0x05, &enable_touch, 1);
 	pause_ms(50);
 
-	/* The controller also wants its bring-up once the panel is on. */
-	for (unsigned round = 0; round < 3; round++) {
-		pause_ms(120000);
-		redwood_tl("s3908: bring-up round %u\n", round + 1);
+	for (unsigned round = 0; round < 10; round++) {
+		for (unsigned i = 0; i < 4500; i++) {
+			if (!level(IRQ) || (i % 10) == 0) {
+				if (tcm_read(chunk, 128)) {
+					if (chunk[0] == TCM_MARKER) {
+						parse_chunk(chunk, 128);
+					}
+				} else {
+					errors++;
+				}
+			}
+			pause_ms(20);
+		}
+		redwood_tl("s3908: round %u done; messages %u reports %u\n", round + 1, msgs, reports);
 		(void)tcm_request("exit deep sleep", 0x2d, NULL, 0);
 		pause_ms(50);
+		static const uint8_t normal_mode[] = { 0x09, 0x00, 0x00 };
+		(void)tcm_request("gesture mode off", 0x24, normal_mode, sizeof(normal_mode));
 		(void)tcm_request("report config", 0x26, report_config, sizeof(report_config));
 		pause_ms(80);
-		uint8_t en = 0x11;
-		(void)tcm_request("enable touch", 0x05, &en, 1);
+		uint8_t en2 = 0x11;
+		(void)tcm_request("enable touch", 0x05, &en2, 1);
 		pause_ms(50);
 	}
-	for (unsigned i = 0; i < 15000; i++) {
-		bool low = !level(IRQ);
-		if (low || true) {
-			if (tcm_read(chunk, 128)) {
-				if (chunk[0] == TCM_MARKER) {
-					if (low) {
-						redwood_tl("s3908: irq low, bytes %02x %02x %02x %02x\n", chunk[0], chunk[1], chunk[2], chunk[3]);
-					}
-					parse_chunk(chunk, 128);
-				}
-			} else {
-				errors++;
-			}
-		}
-		pause_ms(20);
-	}
-	redwood_tl("s3908: diagnostic stopped; messages %u reports %u errors %u\n",
-	    msgs, reports, errors);
-	thread_terminate(current_thread());
+	redwood_tl("s3908: diagnostic stopped; messages %u reports %u errors %u\n", msgs, reports, errors);
+		thread_terminate(current_thread());
 }
 
 void
