@@ -541,10 +541,20 @@ redwood_buttons_init(void)
 	const void *value;
 	unsigned size;
 	/* touchscreen=1 on another board must not start redwood's PMIC mapping. */
-	if (SecureDTLookupEntry(NULL, "/arm-io", &entry) != kSuccess ||
-	    SecureDTGetProperty(entry, "device_type", &value, &size) != kSuccess ||
-	    size != sizeof("redwood") || memcmp(value, "redwood", size)) {
-		return;
+	if (SecureDTLookupEntry(NULL, "/arm-io", &entry) != kSuccess) {
+		printf("buttons: no /arm-io; taking the phone's own mapping
+");
+	} else if (SecureDTGetProperty(entry, "device_type", &value, &size) == kSuccess) {
+		printf("buttons: /arm-io device_type is %.*s
+", (int)(size > 0 ? size - 1 : 0), (const char *)value);
+		if (size == sizeof("redwood") && memcmp(value, "redwood", size) != 0) {
+			printf("buttons: another board; not starting
+");
+			return;
+		}
+	} else {
+		printf("buttons: /arm-io has no device_type; taking the phone's own mapping
+");
 	}
 
 	/*
