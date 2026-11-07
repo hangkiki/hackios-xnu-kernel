@@ -251,9 +251,17 @@ static bool platform_is_lemonade(void) {
     DTEntry entry;
     const void *value;
     unsigned size;
-    return SecureDTLookupEntry(NULL, "/arm-io", &entry) == kSuccess &&
-        SecureDTGetProperty(entry, "device_type", &value, &size) == kSuccess &&
-        size == sizeof("lemonade") && !memcmp(value, "lemonade", size);
+    if (SecureDTLookupEntry(NULL, "/arm-io", &entry) != kSuccess ||
+        SecureDTGetProperty(entry, "device_type", &value, &size) != kSuccess) {
+        redwood_tl("wifi-lemonade: no /arm-io device_type; not starting\n");
+        return false;
+    }
+    redwood_tl("wifi-lemonade: board is %.*s\n", (int)(size > 0 ? size - 1 : 0), (const char *)value);
+    /* OnePlus 9RT (martini) carries the same QCA6490 as the 9. */
+    if (size == sizeof("lemonade") && !memcmp(value, "lemonade", size)) return true;
+    if (size == sizeof("martini") && !memcmp(value, "martini", size)) return true;
+    if (size == sizeof("redwood") && !memcmp(value, "redwood", size)) return true;
+    return false;
 }
 
 static bool inspect(void) {
