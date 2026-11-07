@@ -238,7 +238,7 @@ dump(const char *tag, const uint8_t *data, unsigned length)
 		at += snprintf(text + at, sizeof(text) - at, "%02x ", data[i]);
 	}
 	text[at] = 0;
-	redwood_tl("s3908: %s (%u) %s\n", tag, length, text);
+	if (0) redwood_tl("s3908: %s (%u) %s\n", tag, length, text);
 }
 
 /* The touch report starts with the gesture block (1 + 6 + 24 bytes);
@@ -291,7 +291,7 @@ parse_touch(const uint8_t *data, unsigned length)
 	for (unsigned i = 0; i < objects; i++) {
 		const uint8_t *o = data + object_base + 5 * i;
 		if (reports <= 20) {
-			redwood_tl("s3908: obj %u/%u bytes %02x %02x %02x %02x %02x len %u\n",
+			if (0) redwood_tl("s3908: obj %u/%u bytes %02x %02x %02x %02x %02x len %u\n",
 			    i, objects, o[0], o[1], o[2], o[3], o[4], length);
 		}
 		unsigned index = o[0] & 0x0f;
@@ -307,7 +307,7 @@ parse_touch(const uint8_t *data, unsigned length)
 		}
 		mask |= 1u << index;
 		if (!(active_mask & (1u << index)) && posted_down < 60) {
-			redwood_tl("s3908: down raw %u %u -> screen %u %u\n", x, y, sx, sy);
+			if (0) redwood_tl("s3908: down raw %u %u -> screen %u %u\n", x, y, sx, sy);
 		}
 		if (active_mask & (1u << index)) {
 			redwood_touch_post(REDWOOD_TOUCH_MOVE, index, sx, sy);
@@ -349,7 +349,7 @@ parse_chunk(const uint8_t *data, unsigned length)
 			break;
 		}
 		msgs++;
-		redwood_tl("s3908: message code %02x length %u\n", code, size);
+		if (0) redwood_tl("s3908: message code %02x length %u\n", code, size);
 		dump(code == TCM_REPORT_TOUCH ? "report" : "payload", data + offset + 4, size);
 		if (code == TCM_REPORT_TOUCH) {
 			reports++;
