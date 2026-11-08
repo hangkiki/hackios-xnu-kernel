@@ -708,7 +708,7 @@ display_map_configure(const uint32_t baseline[2])
 	else if (!(valid = display_tlb_sync()))
 		tell("lemonade-display: initial TLB sync failed\n");
 	ml_set_interrupts_enabled(enabled);
-	return (valid || frames == 0) && !os_atomic_load(&display_stopping, acquire);
+	return valid && !os_atomic_load(&display_stopping, acquire);
 }
 
 static bool
@@ -921,18 +921,22 @@ display_refresh_begin(void)
 	if (!sent) { display_refresh_restore(); return false; }
 	/* Observe actual TE callbacks; a timer or a requested rate is not evidence. */
 	uint64_t first = 0, last = 0, first_count = 0, count = 0, period = 0;
-	uint32_t frames0 = rd(intf, 0xac);
+	uint64_t frames0 = os_atomic_load(&irq.count, relaxed);
 	uint64_t start = mach_absolute_time(), elapsed = 0;
 	delay(300000);
-	uint32_t frames1 = rd(intf, 0xac);
+	uint64_t frames1 = os_atomic_load(&irq.count, relaxed);
 	absolutetime_to_nanoseconds(mach_absolute_time() - start, &elapsed);
-	uint64_t frames = (uint32_t)(frames1 - frames0);
+	uint64_t frames = frames1 - frames0;
 	uint64_t mhz = elapsed ? frames * 1000000000000ull / elapsed : 0;
 	bool valid = frames >= 8 && mhz >= 118000 && mhz <= 122000 && !irq.unexpected;
+	uint32_t keep = 0;
+	PE_parse_boot_argn("refresh_keep", &keep, sizeof(keep));
+	/* No frames on screen yet is not evidence of a wrong rate. */
+	if (!valid && keep && frames == 0) valid = true;
 	tell("lemonade-display: refresh measured valid=%u frames=%llu elapsed_us=%llu millihz=%llu\n",
 	    valid, frames, elapsed / 1000, mhz);
 	if (!valid && frames > 0 && !os_atomic_load(&display_stopping, acquire)) display_refresh_restore();
-	if ((valid || frames == 0) && desktop_refresh_requested) os_atomic_store(&desktop_refresh_hz, 120, release);
+	if (valid && desktop_refresh_requested) os_atomic_store(&desktop_refresh_hz, 120, release);
 	return valid && !os_atomic_load(&display_stopping, acquire);
 }
 
