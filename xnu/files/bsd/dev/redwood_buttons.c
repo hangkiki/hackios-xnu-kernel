@@ -404,7 +404,7 @@ pon_inputs(void)
 	    "enabled %#x, latched %#x, pending %#x\n", r[0], (r[0] & PON_KPDPWR) ? "HELD" : "released",
 	    (r[0] & PON_RESIN) ? "HELD" : "released", r[REG_INT_SET_TYPE - REG_RT_STATUS], r[REG_INT_POLARITY_HIGH - REG_RT_STATUS],
 	    r[REG_INT_POLARITY_LOW - REG_RT_STATUS], r[REG_INT_ENABLED - REG_RT_STATUS], more[0], more[1]);
-	power.usable = volume_down.usable = true;
+	if (martini_keys) { power.usable = volume_up.usable = true; } else { power.usable = volume_down.usable = true; }
 	power.last = r[0] & PON_KPDPWR;
 	if (martini_keys) { volume_up.last = r[0] & PON_RESIN; } else { volume_down.last = r[0] & PON_RESIN; }
 }
@@ -567,7 +567,6 @@ redwood_buttons_init(void)
 	unsigned martini = 0;
 	if (PE_parse_boot_argn("buttons_martini", &martini, sizeof(martini)) && martini) {
 		martini_keys = true;
-		pin.id = 0x188;
 		pin.name = "GPIO6 of the PM8350";
 		printf("buttons: martini keys (volume down GPIO6 of the PM8350, volume up RESIN)\n");
 	}
