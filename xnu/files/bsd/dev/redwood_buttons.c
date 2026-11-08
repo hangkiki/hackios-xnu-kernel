@@ -155,6 +155,7 @@ static struct peripheral pin = { .name = "GPIO6 of the PM7325", .id = 0x18d };  
 
 /* martini (OnePlus 9RT): volume down is GPIO6 of the PM8350, volume up is the PMK8350 RESIN */
 static bool martini_keys;
+static bool pin_usable;
 
 /* How the reads have gone: said once a minute. */
 static struct {
@@ -347,7 +348,7 @@ buttons_poll(void)
 			printf("buttons: reading %s: %s\n", pon.name, problem);
 		}
 	}
-	if (volume_up.usable) {
+	if (pin_usable) {
 		problem = spmi_read(&pin, REG_RT_STATUS, &status, 1);
 		if (problem == NULL) {
 			button_look(martini_keys ? &volume_down : &volume_up, !(status & GPIO_LEVEL));
@@ -405,7 +406,7 @@ pon_inputs(void)
 	    r[REG_INT_POLARITY_LOW - REG_RT_STATUS], r[REG_INT_ENABLED - REG_RT_STATUS], more[0], more[1]);
 	power.usable = volume_down.usable = true;
 	power.last = r[0] & PON_KPDPWR;
-	(martini_keys ? volume_up : volume_down).last = r[0] & PON_RESIN;
+	if (martini_keys) { volume_up.last = r[0] & PON_RESIN; } else { volume_down.last = r[0] & PON_RESIN; }
 }
 
 /* Step 4 for the pin: it is volume up only if it is an input with a pull-up, and switched on. */
@@ -437,8 +438,14 @@ pin_input(void)
 		    "which this driver does not do: volume up is left alone\n");
 		return;
 	}
-	volume_up.usable = true;
-	volume_up.last = !(status & GPIO_LEVEL);
+	pin_usable = true;
+	if (martini_keys) {
+		volume_down.usable = true;
+		volume_down.last = !(status & GPIO_LEVEL);
+	} else {
+		volume_up.usable = true;
+		volume_up.last = !(status & GPIO_LEVEL);
+	}
 }
 
 static void
@@ -497,7 +504,7 @@ buttons_thread(void *parameter, __unused wait_result_t result)
 	if (pin_known) {
 		pin_input();
 	}
-	if (!power.usable && !volume_up.usable) {
+	if (!power.usable && !volume_up.usable && !volume_down.usable) {
 		printf("buttons: nothing that can be read: no buttons\n");
 		goto out;
 	}
@@ -510,6 +517,7 @@ buttons_thread(void *parameter, __unused wait_result_t result)
 	power.live = power.usable && !power.last;
 	volume_down.live = volume_down.usable && !volume_down.last;
 	volume_up.live = volume_up.usable && !volume_up.last;
+	pin_usable = volume_up.usable || volume_down.usable;
 	if (steps < 5) {
 		goto out;
 	}
