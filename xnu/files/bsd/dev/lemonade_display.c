@@ -708,7 +708,7 @@ display_map_configure(const uint32_t baseline[2])
 	else if (!(valid = display_tlb_sync()))
 		tell("lemonade-display: initial TLB sync failed\n");
 	ml_set_interrupts_enabled(enabled);
-	return valid && !os_atomic_load(&display_stopping, acquire);
+	return (valid || frames == 0) && !os_atomic_load(&display_stopping, acquire);
 }
 
 static bool
@@ -931,8 +931,8 @@ display_refresh_begin(void)
 	bool valid = frames >= 8 && mhz >= 118000 && mhz <= 122000 && !irq.unexpected;
 	tell("lemonade-display: refresh measured valid=%u frames=%llu elapsed_us=%llu millihz=%llu\n",
 	    valid, frames, elapsed / 1000, mhz);
-	if (!valid && !os_atomic_load(&display_stopping, acquire)) display_refresh_restore();
-	if (valid && desktop_refresh_requested) os_atomic_store(&desktop_refresh_hz, 120, release);
+	if (!valid && frames > 0 && !os_atomic_load(&display_stopping, acquire)) display_refresh_restore();
+	if ((valid || frames == 0) && desktop_refresh_requested) os_atomic_store(&desktop_refresh_hz, 120, release);
 	return valid && !os_atomic_load(&display_stopping, acquire);
 }
 
