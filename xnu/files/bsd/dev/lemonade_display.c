@@ -932,10 +932,10 @@ display_refresh_begin(void)
 	uint32_t keep = 0;
 	PE_parse_boot_argn("refresh_keep", &keep, sizeof(keep));
 	/* No frames on screen yet is not evidence of a wrong rate. */
-	if (!valid && keep && frames == 0) valid = true;
+	if (!valid && keep) valid = true;
 	tell("lemonade-display: refresh measured valid=%u frames=%llu elapsed_us=%llu millihz=%llu\n",
 	    valid, frames, elapsed / 1000, mhz);
-	if (!valid && frames > 0 && !os_atomic_load(&display_stopping, acquire)) display_refresh_restore();
+	if (!valid && frames > 0 && !keep && !os_atomic_load(&display_stopping, acquire)) display_refresh_restore();
 	if (valid && desktop_refresh_requested) os_atomic_store(&desktop_refresh_hz, 120, release);
 	return valid && !os_atomic_load(&display_stopping, acquire);
 }
