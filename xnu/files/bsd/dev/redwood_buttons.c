@@ -341,6 +341,12 @@ buttons_poll(void)
 	if (power.usable || volume_down.usable) {
 		problem = spmi_read(&pon, REG_RT_STATUS, &status, 1);
 		if (problem == NULL) {
+			static uint8_t last_status;
+			if (martini_keys && status != last_status) {
+				last_status = status;
+				printf("buttons: pon status %#x (martini)
+", status);
+			}
 			button_look(&power, status & PON_KPDPWR);
 			button_look(martini_keys ? &volume_up : &volume_down, status & PON_RESIN);
 		} else if (said < 8) {
