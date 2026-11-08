@@ -206,7 +206,7 @@ stage2() {
 	for file in loader.h nlist.h fat.h; do
 		[ -f hostinc/mach-o/$file ] || cp "$XNU_SRC/EXTERNAL_HEADERS/mach-o/$file" hostinc/mach-o/
 	done
-	if [ -n "$REBUILD_LIBS" ]; then rm -f $lib/libfirehose_kernel.a $lib/libpthread_kext.a; fi
+	rm -f $lib/libfirehose_kernel.a $lib/libpthread_kext.a  # always rebuild: the arch may have changed
 	if [ -f $lib/libfirehose_kernel.a ] && [ -f $lib/libpthread_kext.a ]; then
 		log "stage 2: nothing to do"
 		return 0
@@ -217,7 +217,7 @@ stage2() {
 	if [ ! -f $lib/libfirehose_kernel.a ]; then
 		log "building libfirehose_kernel.a"
 		mkdir -p build/firehose
-		xnu-clang -arch arm64 -c -Os -mkernel -nostdinc -fno-builtin \
+		xnu-clang -arch arm64e -c -Os -mkernel -nostdinc -fno-builtin \
 			-DKERNEL=1 -DKERNEL_PRIVATE=1 -DXNU_KERNEL_PRIVATE=0 -DPRIVATE=1 -D__DARWIN_64_BIT_INO_T=1 \
 			-DDISPATCH_USE_DTRACE=0 -DOS_ATOMIC_CONFIG_MEMORY_ORDER_DEPENDENCY=1 \
 			-DOS_ATOMIC_CONFIG_STARVATION_FREE_ONLY=0 -DOS_FIREHOSE_SPI=1 -DARM64_BOARD_CONFIG_BCM2837 \
@@ -230,7 +230,7 @@ stage2() {
 	fi
 	if [ ! -f $lib/libpthread_kext.a ]; then
 		log "building libpthread_kext.a"
-		build/pthread/build.sh
+		sed -i 's/-arch arm64/-arch arm64e/g' build/pthread/build.sh; build/pthread/build.sh
 	fi
 	log "stage 2 done; now: ./xnu-build.sh -j$JOBS -k"
 }
