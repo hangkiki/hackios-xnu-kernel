@@ -153,6 +153,9 @@ struct peripheral {
 static struct peripheral pon = { .name = "the PMK8350's power-on block", .id = 0x013 };          /* registers 0x1300 of slave 0 */
 static struct peripheral pin = { .name = "GPIO6 of the PM7325", .id = 0x18d };                   /* registers 0x8d00 of slave 1 */
 
+/* martini (OnePlus 9RT): volume down is GPIO6 of the PM8350, volume up is the PMK8350 RESIN */
+static bool martini_keys;
+
 /* How the reads have gone: said once a minute. */
 static struct {
 	uint64_t reads, failed, total_ns, longest_ns, last_ns;
@@ -338,7 +341,7 @@ buttons_poll(void)
 		problem = spmi_read(&pon, REG_RT_STATUS, &status, 1);
 		if (problem == NULL) {
 			button_look(&power, status & PON_KPDPWR);
-			button_look(&volume_down, status & PON_RESIN);
+			button_look(martini_keys ? &volume_up : &volume_down, status & PON_RESIN);
 		} else if (said < 8) {
 			said++;
 			printf("buttons: reading %s: %s\n", pon.name, problem);
@@ -347,7 +350,7 @@ buttons_poll(void)
 	if (volume_up.usable) {
 		problem = spmi_read(&pin, REG_RT_STATUS, &status, 1);
 		if (problem == NULL) {
-			button_look(&volume_up, !(status & GPIO_LEVEL));
+			button_look(martini_keys ? &volume_down : &volume_up, !(status & GPIO_LEVEL));
 		} else if (said < 8) {
 			said++;
 			printf("buttons: reading %s: %s\n", pin.name, problem);
@@ -402,7 +405,7 @@ pon_inputs(void)
 	    r[REG_INT_POLARITY_LOW - REG_RT_STATUS], r[REG_INT_ENABLED - REG_RT_STATUS], more[0], more[1]);
 	power.usable = volume_down.usable = true;
 	power.last = r[0] & PON_KPDPWR;
-	volume_down.last = r[0] & PON_RESIN;
+	(martini_keys ? volume_up : volume_down).last = r[0] & PON_RESIN;
 }
 
 /* Step 4 for the pin: it is volume up only if it is an input with a pull-up, and switched on. */
@@ -551,6 +554,14 @@ redwood_buttons_init(void)
 		}
 	} else {
 		printf("buttons: /arm-io has no device_type; taking the phone's own mapping\n");
+	}
+
+	unsigned martini = 0;
+	if (PE_parse_boot_argn("buttons_martini", &martini, sizeof(martini)) && martini) {
+		martini_keys = true;
+		pin.id = 0x188;
+		pin.name = "GPIO6 of the PM8350";
+		printf("buttons: martini keys (volume down GPIO6 of the PM8350, volume up RESIN)\n");
 	}
 
 	/*
