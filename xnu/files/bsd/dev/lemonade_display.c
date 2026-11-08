@@ -921,21 +921,16 @@ display_refresh_begin(void)
 	if (!sent) { display_refresh_restore(); return false; }
 	/* Observe actual TE callbacks; a timer or a requested rate is not evidence. */
 	uint64_t first = 0, last = 0, first_count = 0, count = 0, period = 0;
+	uint32_t frames0 = rd(intf, 0xac);
 	uint64_t start = mach_absolute_time(), elapsed = 0;
-	do {
-		if (lemonade_display_vsync_snapshot(&last, &period, &count)) {
-			if (!first) { first = last; first_count = count; }
-			if (count - first_count >= 64) break;
-		}
-		delay(100);
-		absolutetime_to_nanoseconds(mach_absolute_time() - start, &elapsed);
-	} while (!os_atomic_load(&display_stopping, acquire) && elapsed < NSEC_PER_SEC);
-	uint64_t ns = 0;
-	if (first && last > first) absolutetime_to_nanoseconds(last - first, &ns);
-	uint64_t edges = count - first_count, mhz = ns ? edges * 1000000000000ull / ns : 0;
-	bool valid = edges >= 64 && mhz >= 118000 && mhz <= 122000 && !irq.unexpected;
-	tell("lemonade-display: refresh measured valid=%u edges=%llu elapsed_us=%llu millihz=%llu\n",
-	    valid, edges, ns / 1000, mhz);
+	delay(300000);
+	uint32_t frames1 = rd(intf, 0xac);
+	absolutetime_to_nanoseconds(mach_absolute_time() - start, &elapsed);
+	uint64_t frames = (uint32_t)(frames1 - frames0);
+	uint64_t mhz = elapsed ? frames * 1000000000000ull / elapsed : 0;
+	bool valid = frames >= 8 && mhz >= 118000 && mhz <= 122000 && !irq.unexpected;
+	tell("lemonade-display: refresh measured valid=%u frames=%llu elapsed_us=%llu millihz=%llu\n",
+	    valid, frames, elapsed / 1000, mhz);
 	if (!valid && !os_atomic_load(&display_stopping, acquire)) display_refresh_restore();
 	if (valid && desktop_refresh_requested) os_atomic_store(&desktop_refresh_hz, 120, release);
 	return valid && !os_atomic_load(&display_stopping, acquire);
