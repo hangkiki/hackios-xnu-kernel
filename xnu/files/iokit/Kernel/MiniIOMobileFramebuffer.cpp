@@ -167,6 +167,7 @@ static TUNABLE(uint32_t, gThreads, "fb_threads", 3);
 #define SWAP_QUEUE              2                       /* frames that may wait for the panel at most (fb_queue) */
 static TUNABLE(uint32_t, gQueue, "fb_queue", 2);
 /* Experimental producer-release waits; opt in until desktop acceptance is complete. */
+static uint32_t gPublishedHz;
 static TUNABLE(uint32_t, gFences, "fb_fences", 0);
 #define SWAP_WAIT_MS            5000
 static inline unsigned
@@ -397,6 +398,7 @@ IOMobileFramebuffer::publishModes(void)
 	if (timing == NULL || horizontal == NULL || vertical == NULL || color == NULL || timings == NULL || colors == NULL) {
 		return;
 	}
+	gPublishedHz = refreshHz();
 	setNumber(color, "ID", kFBColorID);
 	setNumber(color, "PixelEncoding", 0);                   /* RGB 4:4:4 */
 	setNumber(color, "Depth", 8);
@@ -1296,6 +1298,7 @@ IOMobileFramebuffer::show(const uint8_t * swap, MiniIOSurface ** surfaces)
 	struct lemonade_present_window hardwareWindow = {};
 	int hardwarePresent = 0;
 	bool direct = lemonade_display_direct_requested(), gpuReady = true;
+	if (direct && gPublishedHz != refreshHz()) MiniIOMobileFramebufferRefreshChanged();
 	int directPresent = 0;
 	bool asynchronousComposite = false;
 
